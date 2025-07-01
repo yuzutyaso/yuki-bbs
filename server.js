@@ -3,23 +3,23 @@ const fs = require("fs");
 const path = require("path");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
+const cookieParser = require('cookie-parser'); // <--- 追加
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, "data.json");
-const ID_FILE = path.join(__dirname, "ID.json"); // 管理者IDを保存するファイル
+const ID_FILE = path.join(__dirname, "ID.json");
 
 // 静的ファイルの配信設定
-// HTML, CSS, クライアントサイドJavaScriptを'public'ディレクトリから配信します
 app.use(express.static(path.join(__dirname, "public")));
-app.use(bodyParser.urlencoded({ extended: true })); // URLエンコードされたボディを解析
-app.use(bodyParser.json()); // JSON形式のボディを解析
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(cookieParser()); // <--- 追加: cookie-parserミドルウェアを有効にする
 
 // 投稿制限のための変数: シードごとの最終投稿時間を記録
 const requestTimestamps = {};
 
-// --- ファイルの初期化 ---
-// data.json が存在しない場合は初期データを作成
+// --- ファイルの初期化（変更なし） ---
 if (!fs.existsSync(DATA_FILE)) {
   const defaultData = {
     topic: "初見さんいらっしゃい　",
@@ -28,10 +28,6 @@ if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
 }
 
-// ID.json が存在しない場合は初期データを作成
-// ここに管理者として許可するシードのハッシュ化されたIDを設定してください。
-// 例: "your_admin_seed" をSHA-256ハッシュ化し、最初の7文字を使う
-// 例: "e0e0a1b" (これは "myadminseed" のハッシュ化した例です)
 if (!fs.existsSync(ID_FILE)) {
   const defaultIdData = {
     admin: "@e0e0a1b", // **ここに実際の管理者IDを設定**
@@ -39,18 +35,10 @@ if (!fs.existsSync(ID_FILE)) {
   fs.writeFileSync(ID_FILE, JSON.stringify(defaultIdData, null, 2));
 }
 
-// --- ヘルパー関数 ---
-
-/**
- * 投稿配列を整理し、最新の3件のみを残します。
- * 新しい投稿が配列の先頭にあることを想定しています。
- * @param {object} jsonData - DATA_FILEからパースされたJSONデータ。
- * @returns {Promise<object>} - 更新されたjsonDataで解決されるPromise。
- */
+// --- ヘルパー関数（変更なし） ---
 function prunePosts(jsonData) {
   return new Promise((resolve, reject) => {
-    jsonData.posts = jsonData.posts.slice(0, 3); // 配列の先頭から3件（最新の3件）を保持
-
+    jsonData.posts = jsonData.posts.slice(0, 3);
     fs.writeFile(DATA_FILE, JSON.stringify(jsonData, null, 2), (err) => {
       if (err) {
         console.error("投稿の整理に失敗しました:", err);
@@ -62,11 +50,6 @@ function prunePosts(jsonData) {
   });
 }
 
-/**
- * シードをSHA-256でハッシュ化し、先頭7文字に'@'を付けたIDを生成します。
- * @param {string} seed - ユーザーが入力したシード（パスワードに相当）。
- * @returns {string} - 生成されたハッシュ化ID（例: @abc1234）。
- */
 function generateHashedId(seed) {
   return (
     "@" +
@@ -74,24 +57,18 @@ function generateHashedId(seed) {
       .createHash("sha256")
       .update(seed)
       .digest("hex")
-      .substring(0, 7) // substrは非推奨なのでsubstringを使用
+      .substring(0, 7)
   );
 }
 
-/**
- * 指定されたハッシュ化IDがID.jsonに登録された管理者IDと一致するかをチェックします。
- * @param {string} hashedId - チェックするハッシュ化ID。
- * @returns {Promise<boolean>} - 管理者であればtrue、そうでなければfalse。
- */
 async function isAdmin(hashedId) {
     try {
         const idDataRaw = await fs.promises.readFile(ID_FILE, "utf8");
         const idJsonData = JSON.parse(idDataRaw);
-        // ID.json の値（管理者ID）が hashedId と一致するかを確認
         return Object.values(idJsonData).includes(hashedId);
     } catch (error) {
         console.error("ID.json の読み込みまたは解析に失敗しました:", error);
-        return false; // エラー時は管理者ではないと判断
+        return false;
     }
 }
 
@@ -110,35 +87,39 @@ app.get("/api", (req, res) => {
 
 // POST /api: 新規投稿
 app.post("/api", async (req, res) => {
-  // POSTリクエストではreq.bodyからデータを取得するのが一般的です
   const { name, pass, content } = req.body;
 
   if (!name || !pass || !content) {
     return res.status(400).json({ error: "すべてのフィールドを入力してください。" });
   }
 
-  // 投稿制限チェック: 同じシードからの投稿は1秒に1回まで
   const now = Date.now();
   if (requestTimestamps[pass] && now - requestTimestamps[pass] < 1000) {
     return res.status(429).json({ error: "同じシードからの投稿は1秒に1回までです。" });
   }
-  requestTimestamps[pass] = now; // タイムスタンプを記録
+  requestTimestamps[pass] = now;
 
-  const hashedId = generateHashedId(pass); // シードをハッシュ化してIDを生成
+  const hashedId = generateHashedId(pass);
+
+  // <--- 追加: 成功した投稿者のIDをクッキーに保存 ---
+  res.cookie('last_posted_id', hashedId, {
+      httpOnly: true, // JavaScriptからアクセス不可にする (セキュリティ)
+      maxAge: 3600000 * 24 * 7, // 1週間有効 (ミリ秒)
+      // secure: true, // HTTPSの場合のみ送信 (本番環境では推奨)
+      // sameSite: 'Lax' // CSRF対策 (本番環境では推奨)
+  });
+  // ----------------------------------------------------
 
   try {
     let data = await fs.promises.readFile(DATA_FILE, "utf8");
     let jsonData = JSON.parse(data);
 
-    // /clear コマンドの処理
     if (content === "/clear") {
-      if (await isAdmin(hashedId)) { // 投稿者が管理者IDかチェック
-        await prunePosts(jsonData); // 管理者なら掲示板を整理
-        // /clearコマンド自体は投稿として記録しない
+      if (await isAdmin(hashedId)) {
+        await prunePosts(jsonData);
         return res.status(200).json({ message: "掲示板がクリアされました。" });
       } else {
         console.log("'/clear' が投稿されましたが、管理者ではありません。通常の投稿として扱います。");
-        // 管理者でない場合は、'/clear' も通常のメッセージとして次の処理に進む
       }
     }
 
@@ -146,19 +127,16 @@ app.post("/api", async (req, res) => {
       name: name,
       content: content,
       id: hashedId,
-      time: new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), // JST固定の投稿時間
-      no: -1, // フロントエンドで付与されることを想定。あるいはここでユニークな番号を付与
-              // 例: Date.now() などを使ってユニークな番号にするか、別途カウンターを用意
+      time: new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
+      no: -1,
     };
 
-    jsonData.posts.unshift(newPost); // 新しい投稿は配列の先頭に追加 (新しいものが上に来るように)
+    jsonData.posts.unshift(newPost);
 
-    // 投稿数が200件を超えたら自動的に整理
     if (jsonData.posts.length > 200) {
       console.log("投稿数が200件を超えました。投稿を整理します。");
-      await prunePosts(jsonData); // これによりjsonData.postsが更新され、ファイルが保存される
+      await prunePosts(jsonData);
     } else {
-      // 整理しない場合は、新しい投稿を保存
       await fs.promises.writeFile(DATA_FILE, JSON.stringify(jsonData, null, 2));
     }
 
@@ -169,24 +147,33 @@ app.post("/api", async (req, res) => {
   }
 });
 
-// POST /topic: トピック変更API (管理者IDで認証)
+// POST /topic: トピック変更API (管理者IDまたはクッキーのIDで認証)
 app.post("/topic", async (req, res) => {
-  const { topic, pass } = req.body; // 管理者パスワードではなく、シード 'pass' を受け取る
+  const { topic, pass } = req.body; // passはオプションにする
 
-  if (!topic || !pass) {
-    return res.status(400).json({ error: "トピックとシードを入力してください。" });
+  let providedHashedId = null;
+
+  // 1. req.body.pass (明示的に入力されたシード) をチェック
+  if (pass) {
+    providedHashedId = generateHashedId(pass);
+  } else {
+  // 2. クッキーに保存されたIDをチェック
+    providedHashedId = req.cookies.last_posted_id; // <--- 追加: クッキーからIDを取得
   }
 
-  const hashedId = generateHashedId(pass); // シードをハッシュ化
+  if (!topic) {
+    return res.status(400).json({ error: "トピックを入力してください。" });
+  }
 
-  if (!(await isAdmin(hashedId))) { // シードから生成されたIDが管理者IDかチェック
-    return res.status(403).json({ error: "権限がありません。管理者シードが正しくありません。" });
+  // providedHashedId が存在し、それが管理者であるかをチェック
+  if (!providedHashedId || !(await isAdmin(providedHashedId))) {
+    return res.status(403).json({ error: "権限がありません。管理者シードが正しくないか、ログインしていません。" });
   }
 
   try {
     let data = await fs.promises.readFile(DATA_FILE, "utf8");
     let jsonData = JSON.parse(data);
-    jsonData.topic = topic; // トピックを更新
+    jsonData.topic = topic;
 
     await fs.promises.writeFile(DATA_FILE, JSON.stringify(jsonData, null, 2));
     res.status(200).json({ message: "トピックが更新されました。" });
