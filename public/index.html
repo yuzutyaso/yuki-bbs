@@ -2,10 +2,11 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>bbs</title>
-<link rel="stylesheet" href="style.css"> </head>
+<title>yuki bbs</title>
+<link rel="stylesheet" href="style.css">
+</head>
 <body>
-<div class="example4"><h1>掲示板</h1></div><br>
+<div class="example4"><h1>掲示板</h1></div>
 新規さんへ、先ずは挨拶をしましょう。シード値は自分のidを決めるものでパスワードのようなものです。<br>
 今の話題に勇気を出して参加してみましょう!!!<br>
 メッセージが送れない場合はメッセージや名前が規制されている可能性があります。<br>
@@ -15,14 +16,15 @@
 <form id="topicForm">
     <label for="newTopic">トピック変更: </label>
     <input type="text" id="newTopic" name="newTopic" maxlength="50" required />
-    <br><label for="adminPassForTopic"> 管理者シード: </label>
-    <input type="password" id="adminPassForTopic" name="adminPassForTopic" required />
+    <label for="adminPassForTopic"> 管理者シード (任意): </label> <input type="password" id="adminPassForTopic" name="adminPassForTopic" />
     <button type="submit">トピック変更</button>
+    <p><small>※最近投稿したシードが管理者の場合、シードの再入力は不要です。</small></p>
 </form>
 <hr>
 
 <select>
 <option>雑談</option>
+<option>バトルスタジアム</option>
 </select><br>
 
 <form id="postForm">
@@ -44,9 +46,9 @@
         maxlength="25"
         required
     />
-    <br>
     <label for="seed"> シード </label>
-    <input type="password" id="seed" name="seed" value="" required /> <button type="submit" id="submit">送信する</button>
+    <input type="password" id="seed" name="seed" value="" required />
+    <button type="submit" id="submit">送信する</button>
 </form>
 
 <br>
@@ -58,7 +60,7 @@
         <tr><th>No</th>    <th>名前</th>    <th>投稿</th>    <th>時間</th></tr>
     </thead>
     <tbody id="postsTableBody">
-        </tbody>
+    </tbody>
 </table>
 
 <script>
@@ -72,16 +74,9 @@
     const newTopicInput = document.getElementById('newTopic');
     const adminPassForTopicInput = document.getElementById('adminPassForTopic');
 
-    // 投稿をテーブルに追加する関数
-    // サーバーから取得したデータ形式に合わせて表示を調整
     function addPostToTable(post, index) {
-        // 新しい投稿は配列の先頭に追加されるので、表示順を考慮してNoを逆算するか、
-        // サーバーから正確なNoを受け取るのが理想的です。
-        // ここでは便宜的に、表示順のインデックスを利用してNoを付与します。
-        const postNo = index + 1; // 0から始まるインデックスなので+1
-        const newRow = postsTableBody.insertRow(); // 最後に追加 (appendChildのイメージ)
-        // または postsTableBody.insertRow(0); で常に一番上に追加することも可能。
-        // ただし、その場合は `loadPosts` で reverse() をしない方が自然。
+        const postNo = index + 1;
+        const newRow = postsTableBody.insertRow();
 
         newRow.innerHTML = `
             <td>${postNo}</td>
@@ -91,14 +86,12 @@
         `;
     }
 
-    // HTMLエスケープ関数 (XSS対策の第一歩)
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.appendChild(document.createTextNode(text));
         return div.innerHTML;
     }
 
-    // 掲示板データをロードして表示する関数
     async function loadPosts() {
         try {
             const response = await fetch('/api');
@@ -107,12 +100,9 @@
             }
             const data = await response.json();
 
-            // トピックの表示を更新
             currentTopicDisplay.innerHTML = `今の話題：<font color="red">${escapeHtml(data.topic)}</font>`;
 
-            // 投稿をクリアして再描画
             postsTableBody.innerHTML = '';
-            // 投稿は新しいものが先頭にあるので、そのままループして追加していく
             data.posts.forEach((post, index) => {
                 addPostToTable(post, index);
             });
@@ -124,7 +114,7 @@
 
     // 投稿フォームの送信イベントリスナー
     postForm.addEventListener('submit', async (e) => {
-        e.preventDefault(); // フォームのデフォルト送信を防ぐ
+        e.preventDefault();
 
         const message = messageInput.value;
         const name = nameInput.value;
@@ -139,7 +129,7 @@
             const response = await fetch('/api', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json', // JSON形式で送信
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ name: name, pass: seed, content: message }),
             });
@@ -148,10 +138,7 @@
 
             if (response.ok) {
                 alert(result.message);
-                messageInput.value = ''; // メッセージ入力欄をクリア
-                // シードは保持するか、クリアするかは要件次第
-                // seedInput.value = '';
-                // 投稿成功後、掲示板を再読み込みして最新の状態にする
+                messageInput.value = '';
                 await loadPosts();
             } else {
                 alert('投稿に失敗しました: ' + result.error);
@@ -167,20 +154,26 @@
         e.preventDefault();
 
         const newTopic = newTopicInput.value;
+        // adminPassForTopicInput.value が空の場合、undefined または空文字になる
         const adminSeed = adminPassForTopicInput.value;
 
-        if (!newTopic || !adminSeed) {
-            alert('新しいトピックと管理者シードは必須です。');
+        if (!newTopic) { // トピックは必須
+            alert('新しいトピックは必須です。');
             return;
         }
 
         try {
+            const bodyData = { topic: newTopic };
+            if (adminSeed) { // adminSeed が入力されていればbodyに含める
+                bodyData.pass = adminSeed;
+            }
+
             const response = await fetch('/topic', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ topic: newTopic, pass: adminSeed }), // passを送信
+                body: JSON.stringify(bodyData), // シードが任意になったため、条件分岐して送信
             });
 
             const result = await response.json();
@@ -188,8 +181,8 @@
             if (response.ok) {
                 alert(result.message);
                 newTopicInput.value = '';
-                adminPassForTopicInput.value = '';
-                await loadPosts(); // トピック更新後、掲示板を再読み込み
+                adminPassForTopicInput.value = ''; // 入力されていてもクリア
+                await loadPosts();
             } else {
                 alert('トピックの変更に失敗しました: ' + result.error);
             }
@@ -199,7 +192,6 @@
         }
     });
 
-    // ページ読み込み時に掲示板データをロード
     document.addEventListener('DOMContentLoaded', loadPosts);
 </script>
 </body>
