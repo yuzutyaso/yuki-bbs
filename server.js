@@ -14,7 +14,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     // 本番環境ではSSL証明書の設定が推奨されます。
-    // HerokuやVercelなど多くのPaaSでは自動的に設定されますが、
     // ローカル環境でのテストや特定のデプロイ環境では 'rejectUnauthorized: false' が必要になる場合があります。
     // セキュリティリスクを理解した上で設定してください。
     rejectUnauthorized: false
@@ -99,24 +98,6 @@ async function getUserRole(hashedId) {
 }
 
 /**
- * 指定されたハッシュ化IDが管理者IDテーブルに存在するかをチェックします。
- * これは 'id_admins' テーブルを使用する場合の互換性関数です。
- * 権限システムと統合するなら、'hasPermission(hashedId, ROLES.MANAGER)' のように使用します。
- */
-async function isAdmin(hashedId) {
-    const client = await pool.connect();
-    try {
-        const res = await client.query('SELECT COUNT(*) FROM id_admins WHERE admin_hashed_id = $1', [hashedId]);
-        return res.rows[0].count > 0;
-    } catch (error) {
-        console.error("管理者IDのチェックに失敗しました:", error.message);
-        return false;
-    } finally {
-        client.release();
-    }
-}
-
-/**
  * 指定されたhashedIdのユーザーが、要求されたrole以上の権限を持っているかチェックします。
  */
 async function hasPermission(hashedId, requiredRole) {
@@ -132,7 +113,6 @@ async function prunePosts() {
   const client = await pool.connect();
   try {
     // 最新の3件のIDを取得し、それ以外の投稿を削除します。
-    // より効率的な方法も可能ですが、ここではシンプルに実装。
     await client.query(`
         DELETE FROM posts
         WHERE id NOT IN (SELECT id FROM posts ORDER BY created_at DESC LIMIT 3)
@@ -362,6 +342,7 @@ app.post("/topic", async (req, res) => {
 });
 
 // GET /id: 管理者ID一覧を返す (デバッグ用)
+// id_admins テーブルの役割は user_roles に統合することが推奨されます
 app.get("/id", async (req, res) => {
     const client = await pool.connect();
     try {
