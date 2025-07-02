@@ -16,7 +16,8 @@
 <form id="topicForm">
     <label for="newTopic">トピック変更: </label>
     <input type="text" id="newTopic" name="newTopic" maxlength="50" required />
-    <label for="adminPassForTopic"> 管理者シード (任意): </label> <input type="password" id="adminPassForTopic" name="adminPassForTopic" />
+    <label for="adminPassForTopic"> 管理者シード (任意): </label>
+    <input type="password" id="adminPassForTopic" name="adminPassForTopic" />
     <button type="submit">トピック変更</button>
     <p><small>※最近投稿したシードが管理者の場合、シードの再入力は不要です。</small></p>
 </form>
@@ -24,7 +25,6 @@
 
 <select>
 <option>雑談</option>
-<option>バトルスタジアム</option>
 </select><br>
 
 <form id="postForm">
@@ -75,7 +75,7 @@
     const adminPassForTopicInput = document.getElementById('adminPassForTopic');
 
     function addPostToTable(post, index) {
-        const postNo = index + 1;
+        const postNo = index + 1; // 投稿番号は表示用に1から始める
         const newRow = postsTableBody.insertRow();
 
         newRow.innerHTML = `
@@ -138,8 +138,8 @@
 
             if (response.ok) {
                 alert(result.message);
-                messageInput.value = '';
-                await loadPosts();
+                messageInput.value = ''; // 投稿成功後、メッセージフィールドをクリア
+                await loadPosts(); // 投稿リストを再読み込み
             } else {
                 alert('投稿に失敗しました: ' + result.error);
             }
@@ -154,7 +154,6 @@
         e.preventDefault();
 
         const newTopic = newTopicInput.value;
-        // adminPassForTopicInput.value が空の場合、undefined または空文字になる
         const adminSeed = adminPassForTopicInput.value;
 
         if (!newTopic) { // トピックは必須
@@ -173,7 +172,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(bodyData), // シードが任意になったため、条件分岐して送信
+                body: JSON.stringify(bodyData),
             });
 
             const result = await response.json();
