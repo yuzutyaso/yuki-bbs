@@ -20,7 +20,17 @@
 </select><br>
 
 <form id="postForm">
-     <label for="name">名前 </label>
+   
+    <label for="message">メッセージ </label>
+    <textarea
+        name="message"
+        rows="6"
+        cols="100"
+        maxlength="100"
+        id="msg"
+        required
+    ></textarea><br><br>
+       <label for="name">名前 </label>
     <input
         type="text"
         id="name"
@@ -32,15 +42,6 @@
     <label for="seed"> シード </label>
     <input type="password" id="seed" name="seed" value="" required />
     <button type="submit" id="submit">送信する</button><br>
-    <label for="message">メッセージ </label>
-    <textarea
-        name="message"
-        rows="6"
-        cols="100"
-        maxlength="100"
-        id="msg"
-        required
-    ></textarea><br><br>
 </form>
 
 <br>
