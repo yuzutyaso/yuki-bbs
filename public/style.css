@@ -1,6 +1,6 @@
 
 h1 {
-    text-align: center; /* 中央寄せは維持 */
+    text-align: left; 
 
     /* 文字を虹色にするためのグラデーションとクリッピング */
     background-image: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet);
