@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<table border="1">
+<a href="https://new-instance-asck.onrender.com/">Yuki Youtube</a><br>
+<head>
+<title>連番を簡単に生成！！</title>
+<style>
+/* 既存のスタイルはそのまま */
+.example4 {
+background: linear-gradient(
+to right,
+#e60000,
+#f39800,
+#fff100,
+#009944,
+#0068b7,
+#1d2088,
+#920783,
+#e60000
+)
+0 / 200%;
+animation: 5s example4 linear infinite;
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+}
+@keyframes example4 {
+100% {
+background-position: 200%;
+}
+}
+.dark
+{
+background-color: #111;
+color: #ddd;
+}
+.dark input,
+.dark textarea,
+.dark button,
+.dark select 
+{
+background-color: #111;
+color: #ddd;
+border: #ddd 1px solid;
+}
+.dark a {
+color: cyan;
+}
+</style>
+</head>
+<body>
+<div class="example4"><h1>掲示板</h1></div>
+新規さんへ、先ずは挨拶をしましょう。シード値は自分のidを決めるものでパスワードのようなものです。<br>
+今の話題に勇気を出して参加してみましょう!!!<br>
+メッセージが送れない場合はメッセージや名前が規制されている可能性があります。<br>
+現在の推定オンライン数は不明です。<br>
+<a href="https://new-instance-asck.onrender.com/bbs/how">使い方</a><br>
+<select>
+<option>雑談</option>
+<option>バトルスタジアム</option>
+</select><br>
+
+<form method="POST" action="/">
+    <label for="message"></label>
+    メッセージ <textarea
+    name="message"
+    rows="6"
+    cols="100"
+    maxlength="100"
+    id="msg"
+    required
+    ></textarea><br><br>
+    <label for="name">名前 </label>
+    <input
+    type="text"
+    id="name"
+    name="name"
+    value=""
+    maxlength="25"
+    required
+    />
+    <label for="seed"> シード </label>
+    <input type="text" id="seed" name="seed" value="" required />
+    <button type="submit" id="submit">送信する</button> </form>
+<br>
+スピーカー以上のメッセージのみ表示<input
+type="checkbox"
+<br>
+<h2>投稿</h2>
+<h3>今の話題：<font color="red">岡山アンチの投稿を永遠に規制中</font><br>岡山の格言：岡山は最高です。</h3>
+<tbody><tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
+{% for post in posts %}
+<tr>
+    <td>{{ post.id }}</td>
+    <td><font color="black">{{ post.name }}</font></td> {# 投稿者の権限による色付けなどは後で実装 #}
+    <td>{{ post.message }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table> </body>
+</html>
