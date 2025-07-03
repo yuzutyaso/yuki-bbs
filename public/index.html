@@ -89,23 +89,76 @@ type="checkbox"
 <h2>投稿</h2>
 <h3>今の話題：<font color="red">岡山アンチの投稿を永遠に規制中</font><br>岡山の格言：岡山は最高です。</h3>
 <table>
-<tbody><tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
-{% for post in posts %}
-<tr>
-    <td>{{ post.id }}</td>
-    <td>
-        <font color="{{ post.author.display_color }}">{{ post.name }}</font>
-        {% if post.author.seed_hash_id %}
-            <font color="darkorange">@{{ post.author.seed_hash_id[:7] }}</font>
-        {% endif %}
-        {% if post.author.additional_info %}
-            <font color="magenta">{{ post.author.additional_info }}</font>
-        {% endif %}
-    </td>
-    <td>{{ post.message }}</td>
-</tr>
-{% endfor %}
-</tbody>
+<thead>
+    <tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
+</thead>
+<tbody id="posts-table-body">
+    </tbody>
 </table>
+
+<script>
+    // ページロード時に投稿を取得して表示する関数
+    async function fetchPosts() {
+        try {
+            const response = await fetch('/api/posts'); // FlaskのAPIエンドポイントからデータを取得
+            const posts = await response.json(); // JSON形式でパース
+            const postsTableBody = document.getElementById('posts-table-body');
+            postsTableBody.innerHTML = ''; // 既存の投稿をクリア
+
+            // 投稿データをループしてHTMLを生成
+            // 投稿を新しい順に表示する場合は、ループを逆順にするか、APIで降順に取得する
+            // 今回はAPIでタイムスタンプ昇順で取得し、HTMLで新しい順に表示するため、
+            // 投稿ID (i) を逆順に表示する。
+            for (let i = posts.length - 1; i >= 0; i--) {
+                const post = posts[i];
+                const row = document.createElement('tr');
+                
+                // No. を表示 (画像に合わせて新しい投稿から連番を振る場合は id を使うか、別の計算)
+                // 画像の例では、最新が6、一番下が0なので、単純に0からのインデックスだと逆順になる
+                // ここでは、Post APIで0からインデックスを振ったものをそのまま表示
+                row.innerHTML = `
+                    <td>${post.id}</td>
+                    <td>
+                        <font color="${post.display_color}">${post.name}</font>
+                        ${post.seed_hash_display ? `<font color="darkorange">@${post.seed_hash_display}</font>` : ''}
+                        ${post.additional_info ? `<font color="magenta">${post.additional_info}</font>` : ''}
+                    </td>
+                    <td>${post.message}</td>
+                `;
+                postsTableBody.appendChild(row);
+            }
+
+            // もし画像のように最新の投稿が一番上の番号 (例: 6) で、古い投稿が一番下の番号 (例: 0) となるようにしたい場合は
+            // API側で posts = Post.query.join(User).order_by(Post.timestamp.desc()).all() (降順) にし、
+            // JavaScript側で post.id の代わりに `posts.length - 1 - i` や `i` を利用して表示する
+            // 現在のAPIはタイムスタンプ昇順 (古いものが最初) で0からのIDを振っているので、
+            // 最新の投稿から順に表示する場合は、posts配列を逆順にループする必要があります。
+            // `for (let i = posts.length - 1; i >= 0; i--)` このループで最新から表示される。
+            // そして、`id`はAPIで振られた0から始まるIDなので、`post.id`をそのまま表示すると、
+            // カルパス財団が0、最新の投稿が最大のIDになります。
+            // 画像の表示方法を厳密に再現するなら、APIでIDも振らずにDBからそのままのIDを取得し、
+            // JavaScriptで表示時の番号を調整するのが複雑になります。
+            // ここではAPIで振られた0からのIDをそのまま使います。
+            // もし画像のように連番をつけたいのであれば、以下のように変更:
+            // let displayNo = posts.length - 1; // 初期投稿から順に表示されることを想定
+            // for (let i = 0; i < posts.length; i++) {
+            //     const post = posts[i];
+            //     const row = document.createElement('tr');
+            //     row.innerHTML = `<td>${displayNo}</td>...`
+            //     displayNo--;
+            // }
+
+        } catch (error) {
+            console.error('Error fetching posts:', error);
+        }
+    }
+
+    // ページが完全に読み込まれた後に投稿を取得
+    document.addEventListener('DOMContentLoaded', fetchPosts);
+
+    // フォーム送信後のリダイレクト時にページを更新して投稿を再読み込み
+    // （今回はPOST後にredirect(url_for('index'))しているので、自動でfetchPostsが実行される）
+    // もしAJAXでフォーム送信をする場合は、送信成功後に fetchPosts() を呼び出す。
+</script>
 </body>
 </html>
