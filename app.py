@@ -1,8 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify # jsonify をインポート
 from flask_sqlalchemy import SQLAlchemy
 import hashlib
 import os
-import datetime # datetimeモジュールをインポート
+import datetime
 
 app = Flask(__name__, template_folder='public')
 
@@ -40,7 +40,7 @@ class NgWord(db.Model):
     def __repr__(self):
         return f"NgWord('{self.word}')"
 
-# --- ルーティング (変更なし) ---
+# --- ルーティング ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -53,7 +53,7 @@ def index():
         user = User.query.filter_by(seed_hash_id=seed_hash).first()
 
         if not user:
-            user = User(seed_hash_id=seed_hash, display_color='black', additional_info='')
+            user = User(seed_hash_id=seed_hash, display_color='red', additional_info='') # 初期ユーザーを赤色に設定
             db.session.add(user)
             db.session.commit()
 
@@ -67,54 +67,56 @@ def index():
         db.session.commit()
         return redirect(url_for('index'))
 
-    posts = Post.query.join(User).order_by(Post.id.desc()).all()
-    return render_template('index.html', posts=posts)
+    # GETリクエストの場合、最初にHTMLページをレンダリングする
+    # JavaScriptからデータを取得するためのエンドポイントは別に用意する
+    return render_template('index.html')
+
+# 投稿データをJSON形式で返す新しいエンドポイント
+@app.route('/api/posts', methods=['GET'])
+def get_posts():
+    # タイムスタンプの昇順（古いものが先頭）で取得
+    posts = Post.query.join(User).order_by(Post.timestamp.asc()).all()
+    
+    posts_data = []
+    for i, post in enumerate(posts):
+        posts_data.append({
+            'id': i, # ここで0から始まるインデックスを付与
+            'name': post.name,
+            'message': post.message,
+            'display_color': post.author.display_color,
+            'seed_hash_display': post.author.seed_hash_id[:7] if post.author.seed_hash_id else '',
+            'additional_info': post.author.additional_info
+        })
+    return jsonify(posts_data)
+
 
 # データベースの初期化と初期データ投入
 with app.app_context():
     db.create_all()
 
-    # 初期投稿のチェックと投入
-    # Postテーブルが空の場合にのみ実行
     if not Post.query.first():
-        # 「カルパス財団」ユーザーが存在しない場合は作成
-        kalpas_seed = "kalpas_foundation_seed" # 特定のシード値
+        kalpas_seed = "kalpas_foundation_seed"
         kalpas_hash = hashlib.sha256(kalpas_seed.encode('utf-8')).hexdigest()
         kalpas_user = User.query.filter_by(seed_hash_id=kalpas_hash).first()
 
         if not kalpas_user:
             kalpas_user = User(
                 seed_hash_id=kalpas_hash,
-                display_color='red', # 「System」の色に合わせて赤に設定
+                display_color='red', # 「カルパス財団」の色を赤に設定
                 additional_info=''
             )
             db.session.add(kalpas_user)
             db.session.commit()
 
-        # メッセージ番号0の投稿を作成
-        # SQLiteのAUTOINCREMENTは通常1から始まるため、ID=0を直接挿入するのは難しい場合がある。
-        # 代わりに、一番古い投稿として表示されるように工夫するか、
-        # IDを明示的に指定して挿入を試みる。
-        # SQLAlchemyでは通常、主キーは自動生成されるため、
-        # Postテーブルが空のときに最初の投稿として挿入されれば、
-        # IDが1になることが多いが、表示上は「0」としたい場合は、
-        # 投稿取得時に表示順を操作するか、IDを格納するカラムとは別に表示用のNoを管理する必要がある。
-        # ここでは単純にPostを挿入し、IDはDBの自動採番に任せます。
-        # そして、一番古い投稿として確実に「0」と表示されるように、
-        # HTMLの表示部分を工夫する必要があります。
-        # まずは、DBに投入するだけ。HTMLでの表示は後続で調整します。
-
-        # 既存のPostテーブルにデータがない場合のみ初期投稿を挿入
         initial_message = "ｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽｶﾙﾊﾟｽ"
         initial_post = Post(
             name="カルパス財団",
             message=initial_message,
             user_id=kalpas_user.id,
-            timestamp=datetime.datetime(2025, 7, 3, 0, 0, 0) # 確実に一番古いタイムスタンプを設定
+            timestamp=datetime.datetime(2025, 1, 1, 0, 0, 0) # 確実に一番古いタイムスタンプを設定
         )
         db.session.add(initial_post)
         db.session.commit()
-
 
 if __name__ == '__main__':
     app.run(debug=True)
