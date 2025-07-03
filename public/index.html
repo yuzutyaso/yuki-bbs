@@ -88,11 +88,20 @@ type="checkbox"
 <br>
 <h2>投稿</h2>
 <h3>今の話題：<font color="red">岡山アンチの投稿を永遠に規制中</font><br>岡山の格言：岡山は最高です。</h3>
-<table> <tbody><tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
+<table>
+<tbody><tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
 {% for post in posts %}
 <tr>
     <td>{{ post.id }}</td>
-    <td><font color="black">{{ post.name }}</font><font color="darkorange">@{{ post.seed_hash[:7] }}</font></td>
+    <td>
+        <font color="{{ post.author.display_color }}">{{ post.name }}</font>
+        {% if post.author.seed_hash_id %}
+            <font color="darkorange">@{{ post.author.seed_hash_id[:7] }}</font>
+        {% endif %}
+        {% if post.author.additional_info %}
+            <font color="magenta">{{ post.author.additional_info }}</font>
+        {% endif %}
+    </td>
     <td>{{ post.message }}</td>
 </tr>
 {% endfor %}
