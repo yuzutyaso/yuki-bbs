@@ -80,21 +80,23 @@ color: cyan;
     />
     <label for="seed"> シード </label>
     <input type="text" id="seed" name="seed" value="" required />
-    <button type="submit" id="submit">送信する</button> </form>
+    <button type="submit" id="submit">送信する</button>
+</form>
 <br>
 スピーカー以上のメッセージのみ表示<input
 type="checkbox"
 <br>
 <h2>投稿</h2>
 <h3>今の話題：<font color="red">岡山アンチの投稿を永遠に規制中</font><br>岡山の格言：岡山は最高です。</h3>
-<tbody><tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
+<table> <tbody><tr><th>No</th>    <th>名前</th>    <th>投稿</th>    </tr>
 {% for post in posts %}
 <tr>
     <td>{{ post.id }}</td>
-    <td><font color="black">{{ post.name }}</font></td> {# 投稿者の権限による色付けなどは後で実装 #}
+    <td><font color="black">{{ post.name }}</font><font color="darkorange">@{{ post.seed_hash[:7] }}</font></td>
     <td>{{ post.message }}</td>
 </tr>
 {% endfor %}
 </tbody>
-</table> </body>
+</table>
+</body>
 </html>
